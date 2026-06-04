@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+
+.playwright-mcp
+edge-profile-fresh
+chrome-profile-fresh
