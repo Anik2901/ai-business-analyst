@@ -167,8 +167,7 @@ function getDownstreamTypes(fromStep: number): DocumentType[] {
 const GEN_STORAGE_KEY = 'ba-generation-state'
 const OUTPUTS_STORAGE_KEY = 'ba-generation-outputs'
 const CONTEXT_STORAGE_KEY = 'ba-generation-context'
-// Identifies WHICH conversation a generation belongs to, so stale docs from a
-// previous/interrupted topic can never leak into a new one (cross-pollination).
+// Tags a generation to its conversation, to prevent stale-doc cross-pollination.
 const SIG_STORAGE_KEY = 'ba-generation-sig'
 
 function loadGeneration(): GenerationState {
@@ -234,7 +233,6 @@ export function useGenerate() {
     const onChunk = (fullText: string) => { setStreamingText(fullText) }
 
     const stepConfig: Record<number, { type: DocumentType; getPrompt: () => string; maxTokens: number }> = {
-      // Output cap per doc — configurable via VITE_MAX_TOKENS (config.ts), not hardcoded.
       1: { type: 'brd', maxTokens: MAX_TOKENS, getPrompt: () => getBRDPrompt(chatContext) },
       2: { type: 'frd', maxTokens: MAX_TOKENS, getPrompt: () => getFRDPrompt(chatContext, outputs.brd || '') },
       3: { type: 'nfr', maxTokens: MAX_TOKENS, getPrompt: () => getNFRPrompt(chatContext, outputs.brd || '', outputs.frd || '') },

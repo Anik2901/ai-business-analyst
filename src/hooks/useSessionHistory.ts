@@ -16,8 +16,7 @@ function saveSessions(sessions: SavedSession[]) {
   try {
     localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
   } catch {
-    // localStorage quota exceeded — drop oldest sessions and retry, then give up
-    // quietly rather than crashing the whole app.
+    // localStorage full — keep fewer sessions rather than crash.
     for (const keep of [10, 5, 2, 1, 0]) {
       try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, keep))); return } catch { /* try fewer */ }
     }

@@ -7,9 +7,6 @@ import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
 mermaid.initialize({
   startOnLoad: false,
   theme: 'dark',
-  // 'strict' (Mermaid's default) HTML-encodes text in labels and disables click
-  // handlers — the diagram source is LLM-generated from user notes, so we never
-  // want raw HTML/script to flow through. Rendered SVG is also sanitized below.
   securityLevel: 'strict',
   fontFamily: 'ui-sans-serif, system-ui, sans-serif',
   flowchart: {
@@ -50,15 +47,10 @@ interface Props {
   className?: string
 }
 
-// LLMs often add parenthetical annotations inside node labels (e.g. "Web Push (FCM)")
-// which break Mermaid. Shape delimiters like [( )] and ([ ]) have no space before "(",
-// so stripping " (...)" removes only the annotations, never a valid shape.
+// Strip characters that break Mermaid in LLM-generated diagrams.
 function sanitizeMermaid(chart: string): string {
   const type = chart.trim().split(/[\s\n]/)[0]
 
-  // Sequence diagrams break when message/note text contains ; { } ( ) — Mermaid reads
-  // ";" as a statement separator and "{ }" as syntax. Clean the text after the first
-  // ":" on each line (that's where the message/note content lives).
   if (type === 'sequenceDiagram') {
     return chart.split('\n').map(line => {
       const idx = line.indexOf(':')
@@ -68,16 +60,12 @@ function sanitizeMermaid(chart: string): string {
     }).join('\n')
   }
 
-  // Flowchart / graph: strip " (annotations)" and hard-clean hexagon {{...}} labels
-  // ([( )] cylinders and ([ ]) stadiums have no space before "(", so they're safe).
   let c = chart.replace(/ \([^)]*\)/g, '')
   c = c.replace(/\{\{([^{}]*)\}\}/g, (_m, l) => '{{' + l.replace(/[^A-Za-z0-9 ./&%+-]/g, '').replace(/\s+/g, ' ').trim() + '}}')
   return c
 }
 
-// Serialize mermaid.render calls. Mermaid shares internal DOM state, so rendering
-// several diagrams at once (e.g. graph + ER on the Architecture tab, or 3 on Flows)
-// races and throws "Cannot read properties of null (reading 'firstChild')".
+// Serialize renders — concurrent mermaid.render calls race on shared state.
 let mermaidQueue: Promise<unknown> = Promise.resolve()
 function queuedRender(id: string, src: string): Promise<{ svg: string }> {
   const run = mermaidQueue.then(() => mermaid.render(id, src))
@@ -98,10 +86,8 @@ export default function MermaidDiagram({ chart, className }: Props) {
       const id = `mermaid-${crypto.randomUUID().replace(/-/g, '')}`
       try {
         const { svg: rendered } = await queuedRender(id, src.trim())
-        // Defense in depth: sanitize the rendered SVG before injecting it.
         return DOMPurify.sanitize(rendered, { USE_PROFILES: { svg: true, svgFilters: true } })
       } finally {
-        // On failure Mermaid leaves an orphan node ('d' + id, or id) in <body>. Remove it.
         document.getElementById(id)?.remove()
         document.getElementById('d' + id)?.remove()
       }
@@ -113,7 +99,6 @@ export default function MermaidDiagram({ chart, className }: Props) {
         try {
           cleanSvg = await renderOnce(chart)
         } catch {
-          // Retry with common LLM label mistakes stripped before giving up.
           cleanSvg = await renderOnce(sanitizeMermaid(chart))
         }
         if (!cancelled) {
@@ -125,7 +110,6 @@ export default function MermaidDiagram({ chart, className }: Props) {
           setError(err instanceof Error ? err.message : 'Failed to render diagram')
           setSvg('')
         }
-        // Sweep any stray Mermaid error nodes that leaked into <body>.
         document.querySelectorAll('body > [id^="dmermaid-"], body > svg[id^="mermaid-"]').forEach(el => el.remove())
       }
     }

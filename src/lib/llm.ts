@@ -2,11 +2,6 @@ import Anthropic from '@anthropic-ai/sdk'
 import OpenAI from 'openai'
 import { MODEL, PROTOCOL } from './config'
 
-// All requests go through the dev-server proxy at /api/llm. The proxy injects the
-// real API key server-side (so it never reaches the browser) and forwards to
-// whatever LLM_BASE_URL points at. This works with ANY provider:
-//   - protocol 'anthropic' -> Anthropic Messages API   (Anthropic, LiteLLM, compatible gateways)
-//   - protocol 'openai'    -> OpenAI Chat Completions   (OpenRouter, OpenAI, Groq, Together, Ollama, ...)
 const PROXY_BASE = window.location.origin + '/api/llm'
 
 const anthropicClient = new Anthropic({

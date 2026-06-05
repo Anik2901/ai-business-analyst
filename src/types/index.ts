@@ -5,8 +5,6 @@ export interface ChatMessage {
   role: MessageRole
   content: string
   timestamp: number
-  // When set, the chat renders a compact file chip instead of the raw content
-  // (used for uploaded notes — the full text still goes to the model via content).
   attachment?: { name: string }
 }
 

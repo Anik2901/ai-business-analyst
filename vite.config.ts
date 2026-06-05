@@ -23,8 +23,6 @@ export default defineConfig(({ mode }) => {
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
               const key = env.LLM_API_KEY || ''
-              // Set both auth schemes so either protocol works with zero per-provider tweaking:
-              // Anthropic uses `x-api-key`; OpenAI-compatible uses `Authorization: Bearer`.
               proxyReq.setHeader('x-api-key', key)
               proxyReq.setHeader('authorization', `Bearer ${key}`)
               proxyReq.setHeader('anthropic-version', '2023-06-01')
