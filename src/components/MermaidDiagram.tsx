@@ -75,6 +75,16 @@ function sanitizeMermaid(chart: string): string {
   return c
 }
 
+// Serialize mermaid.render calls. Mermaid shares internal DOM state, so rendering
+// several diagrams at once (e.g. graph + ER on the Architecture tab, or 3 on Flows)
+// races and throws "Cannot read properties of null (reading 'firstChild')".
+let mermaidQueue: Promise<unknown> = Promise.resolve()
+function queuedRender(id: string, src: string): Promise<{ svg: string }> {
+  const run = mermaidQueue.then(() => mermaid.render(id, src))
+  mermaidQueue = run.then(() => undefined, () => undefined)
+  return run
+}
+
 export default function MermaidDiagram({ chart, className }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [svg, setSvg] = useState<string>('')
@@ -87,7 +97,7 @@ export default function MermaidDiagram({ chart, className }: Props) {
     const renderOnce = async (src: string) => {
       const id = `mermaid-${crypto.randomUUID().replace(/-/g, '')}`
       try {
-        const { svg: rendered } = await mermaid.render(id, src.trim())
+        const { svg: rendered } = await queuedRender(id, src.trim())
         // Defense in depth: sanitize the rendered SVG before injecting it.
         return DOMPurify.sanitize(rendered, { USE_PROFILES: { svg: true, svgFilters: true } })
       } finally {
