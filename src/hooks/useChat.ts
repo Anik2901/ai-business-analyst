@@ -37,12 +37,13 @@ export function useChat() {
     localStorage.setItem(READY_KEY, String(readyToGenerate))
   }, [readyToGenerate])
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, attachment?: { name: string }) => {
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content,
       timestamp: Date.now(),
+      ...(attachment ? { attachment } : {}),
     }
 
     setMessages(prev => [...prev, userMessage])

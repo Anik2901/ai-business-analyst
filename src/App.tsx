@@ -106,7 +106,7 @@ export default function App() {
         const hasStaleGeneration = gen.generation.tabs.some(t => t.status !== 'idle')
         if (hasStaleGeneration) gen.reset()
       }
-      chat.sendMessage(wrapped)
+      chat.sendMessage(wrapped, { name: file.name })
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Could not read that file.')
     } finally {

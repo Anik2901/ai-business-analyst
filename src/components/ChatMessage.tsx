@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import type { ChatMessage as ChatMessageType } from '@/types'
-import { BrainCircuit, User } from 'lucide-react'
+import { BrainCircuit, User, FileText } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -34,7 +34,14 @@ export default function ChatMessage({ message }: Props) {
         )}
       >
         {isUser ? (
-          <span className="whitespace-pre-wrap">{displayContent}</span>
+          message.attachment ? (
+            <span className="flex items-center gap-2 font-medium">
+              <FileText className="h-4 w-4 shrink-0" />
+              {message.attachment.name}
+            </span>
+          ) : (
+            <span className="whitespace-pre-wrap">{displayContent}</span>
+          )
         ) : displayContent ? (
           <div className="prose prose-sm dark:prose-invert max-w-none prose-headings:mt-3 prose-headings:mb-1.5 prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-strong:text-foreground prose-strong:font-semibold prose-code:text-foreground prose-code:bg-background/60 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:before:content-none prose-code:after:content-none prose-pre:bg-background/60 prose-a:text-primary">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayContent}</ReactMarkdown>
