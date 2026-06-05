@@ -163,6 +163,7 @@ flowchart TD\n    input[/User Request/]\n    validate[Validate Input]\n    auth{
 
 CRITICAL RULES:
 - Return ONLY valid JSON. No markdown code fences. No text before or after the JSON.
+- Node and edge labels must be PLAIN text: letters, numbers, and spaces ONLY. NEVER put parentheses, slashes, brackets, quotes, or colons inside a label — write "Web Push FCM" not "Web Push (FCM)". Special characters inside labels are the #1 cause of broken diagrams.
 - Mermaid code must be a plain string with \\n for newlines (no \`\`\`mermaid fences).
 - Use \\n for line breaks within the Mermaid string — do NOT use actual newlines inside JSON string values.
 - Service names in diagrams MUST match the architecture diagram from the previous call.

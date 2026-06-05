@@ -111,6 +111,7 @@ erDiagram\n    USER {\n        uuid id PK\n        string email\n        string 
 
 CRITICAL RULES:
 - Return ONLY valid JSON. No markdown code fences. No text before or after the JSON.
+- Node and edge labels must be PLAIN text: letters, numbers, and spaces ONLY. NEVER put parentheses, slashes, brackets, quotes, or colons inside a label — write "Web Push FCM" not "Web Push (FCM)", "PostgreSQL 15" not "PostgreSQL (15)". Special characters inside labels are the #1 cause of broken diagrams.
 - Mermaid code must be a plain string with \\n for newlines (no \`\`\`mermaid fences). Just the raw Mermaid syntax.
 - Use \\n for line breaks within the Mermaid string — do NOT use actual newlines inside JSON string values.
 - Double-check that all Mermaid node IDs are consistent — if you define "auth_svc" in a subgraph, reference it as "auth_svc" in edges.

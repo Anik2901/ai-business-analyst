@@ -50,6 +50,13 @@ interface Props {
   className?: string
 }
 
+// LLMs often add parenthetical annotations inside node labels (e.g. "Web Push (FCM)")
+// which break Mermaid. Shape delimiters like [( )] and ([ ]) have no space before "(",
+// so stripping " (...)" removes only the annotations, never a valid shape.
+function sanitizeMermaid(chart: string): string {
+  return chart.replace(/ \([^)]*\)/g, '')
+}
+
 export default function MermaidDiagram({ chart, className }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [svg, setSvg] = useState<string>('')
@@ -59,12 +66,22 @@ export default function MermaidDiagram({ chart, className }: Props) {
 
     let cancelled = false
 
+    const renderOnce = async (src: string) => {
+      const id = `mermaid-${crypto.randomUUID().replace(/-/g, '')}`
+      const { svg: rendered } = await mermaid.render(id, src.trim())
+      // Defense in depth: sanitize the rendered SVG before injecting it.
+      return DOMPurify.sanitize(rendered, { USE_PROFILES: { svg: true, svgFilters: true } })
+    }
+
     const render = async () => {
       try {
-        const id = `mermaid-${crypto.randomUUID().replace(/-/g, '')}`
-        const { svg: renderedSvg } = await mermaid.render(id, chart.trim())
-        // Defense in depth: sanitize the rendered SVG before injecting it.
-        const cleanSvg = DOMPurify.sanitize(renderedSvg, { USE_PROFILES: { svg: true, svgFilters: true } })
+        let cleanSvg: string
+        try {
+          cleanSvg = await renderOnce(chart)
+        } catch {
+          // Retry with common LLM label mistakes stripped before giving up.
+          cleanSvg = await renderOnce(sanitizeMermaid(chart))
+        }
         if (!cancelled) {
           setSvg(cleanSvg)
           setError(null)

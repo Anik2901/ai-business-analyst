@@ -50,6 +50,8 @@ async function callClaudeWithRetry(
 // Fix common JSON issues from LLM output
 function sanitizeJSON(text: string): string {
   let s = text
+  // Strip control characters invalid in JSON (keep tab/newline/CR) - common in LLM output.
+  s = Array.from(s).filter(c => { const n = c.charCodeAt(0); return n >= 32 || n === 9 || n === 10 || n === 13 }).join(String());
   // Remove trailing commas before } or ]
   s = s.replace(/,\s*([}\]])/g, '$1')
   // Fix unescaped newlines inside strings (common in acceptance criteria)
@@ -231,13 +233,15 @@ export function useGenerate() {
     const onChunk = (fullText: string) => { setStreamingText(fullText) }
 
     const stepConfig: Record<number, { type: DocumentType; getPrompt: () => string; maxTokens: number }> = {
-      1: { type: 'brd', maxTokens: 8192, getPrompt: () => getBRDPrompt(chatContext) },
-      2: { type: 'frd', maxTokens: 8192, getPrompt: () => getFRDPrompt(chatContext, outputs.brd || '') },
-      3: { type: 'nfr', maxTokens: 8192, getPrompt: () => getNFRPrompt(chatContext, outputs.brd || '', outputs.frd || '') },
-      4: { type: 'stories', maxTokens: 8192, getPrompt: () => getUserStoriesPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || '') + '\n' + (outputs.nfr || '')) },
-      5: { type: 'architecture', maxTokens: 8192, getPrompt: () => getArchitecturePrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '') },
-      6: { type: 'flows', maxTokens: 8192, getPrompt: () => getFlowDiagramsPrompt(chatContext, outputs.frd || '', outputs.stories || '', outputs.architecture || '') },
-      7: { type: 'risk', maxTokens: 8192, getPrompt: () => getRiskAnalysisPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '', outputs.architecture || '', outputs.flows || '') },
+      // Token budgets sized to each doc — User Stories / Risk are the largest and
+      // were truncating at 8192 (which broke the JSON). Larger caps prevent that.
+      1: { type: 'brd', maxTokens: 10000, getPrompt: () => getBRDPrompt(chatContext) },
+      2: { type: 'frd', maxTokens: 12000, getPrompt: () => getFRDPrompt(chatContext, outputs.brd || '') },
+      3: { type: 'nfr', maxTokens: 10000, getPrompt: () => getNFRPrompt(chatContext, outputs.brd || '', outputs.frd || '') },
+      4: { type: 'stories', maxTokens: 16000, getPrompt: () => getUserStoriesPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || '') + '\n' + (outputs.nfr || '')) },
+      5: { type: 'architecture', maxTokens: 12000, getPrompt: () => getArchitecturePrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '') },
+      6: { type: 'flows', maxTokens: 12000, getPrompt: () => getFlowDiagramsPrompt(chatContext, outputs.frd || '', outputs.stories || '', outputs.architecture || '') },
+      7: { type: 'risk', maxTokens: 16000, getPrompt: () => getRiskAnalysisPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '', outputs.architecture || '', outputs.flows || '') },
     }
 
     const config = stepConfig[step]

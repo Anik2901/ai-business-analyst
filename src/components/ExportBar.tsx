@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { Button } from '@/components/ui/button'
 import { Download, FileText, RotateCcw, Loader2, FileDown } from 'lucide-react'
 import type { DocumentTabState, DocumentType } from '@/types'
@@ -39,89 +41,109 @@ function renderUserStories(data: unknown): string {
   return obj.epics.map(epic => {
     const header = `## ${epic.name}\n\n${epic.description}\n`
     const stories = (epic.stories || []).map(story => {
-      const ac = (story.acceptanceCriteria || []).map(c => `  - ${c}`).join('\n')
+      const ac = (story.acceptanceCriteria || []).map(c => `- ${c}`).join('\n')
       return `### ${story.id}: As a ${story.role}, I want to ${story.action}, so that ${story.benefit}\n\n**Priority:** ${story.priority} | **Story Points:** ${story.storyPoints}\n\n**Acceptance Criteria:**\n${ac}`
     }).join('\n\n')
     return `${header}\n${stories}`
   }).join('\n\n---\n\n')
 }
 
-function markdownToSimpleHTML(md: string): string {
-  if (!md) return ''
-  let html = md.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  html = html.replace(/```(?:mermaid|json|[\w]*)?\s*\n([\s\S]*?)```/g, '<pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;font-size:11px;margin:12px 0;"><code>$1</code></pre>')
-  html = html.replace(/^### (.+)$/gm, '<h3 style="font-size:16px;margin:16px 0 8px;color:#222;">$1</h3>')
-  html = html.replace(/^## (.+)$/gm, '<h2 style="font-size:18px;margin:20px 0 10px;color:#222;">$1</h2>')
-  html = html.replace(/^# (.+)$/gm, '<h1 style="font-size:22px;margin:24px 0 12px;color:#111;">$1</h1>')
-  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>')
-  html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid #e5e5e5;margin:16px 0;">')
-  html = html.replace(/(\|.+\|)\n(\|[-:\s|]+\|)\n((?:\|.+\|\n?)+)/g, (_match, headerRow: string, _sep: string, bodyRows: string) => {
-    const headers = headerRow.split('|').filter((c: string) => c.trim()).map((c: string) => c.trim())
-    const rows = bodyRows.trim().split('\n').map((row: string) => row.split('|').filter((c: string) => c.trim()).map((c: string) => c.trim()))
-    const th = headers.map((h: string) => `<th style="border:1px solid #ddd;padding:8px;background:#f8f8f8;text-align:left;font-size:12px;">${h}</th>`).join('')
-    const body = rows.map((row: string[]) => '<tr>' + row.map((cell: string) => `<td style="border:1px solid #ddd;padding:8px;font-size:12px;">${cell}</td>`).join('') + '</tr>').join('')
-    return `<table style="border-collapse:collapse;width:100%;margin:12px 0;"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`
-  })
-  html = html.replace(/^- (.+)$/gm, '<li style="margin:4px 0;font-size:12px;">$1</li>')
-  html = html.replace(/(<li[^>]*>.*<\/li>\n?)+/g, (match) => `<ul style="padding-left:24px;margin:8px 0;">${match}</ul>`)
-  html = html.replace(/^\d+\. (.+)$/gm, '<li style="margin:4px 0;font-size:12px;">$1</li>')
-  html = html.replace(/^(?!<[hupltof]|<\/|<hr|<pre|<code|<strong|<em|<br)(.+)$/gm, '<p style="margin:8px 0;font-size:12px;">$1</p>')
-  html = html.replace(/\n\n/g, '<br>')
-  return html
+// --- Real-text PDF rendering with jsPDF (selectable text, no html2canvas) ---
+
+function stripInline(s: string): string {
+  return s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').replace(/`([^`]+)`/g, '$1')
 }
 
-async function exportTabsToPDF(tabsToExport: DocumentTabState[], filename: string) {
-  const html2pdf = (await import('html2pdf.js')).default
+function splitRow(line: string): string[] {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => stripInline(c.trim()))
+}
 
-  const container = document.createElement('div')
-  container.style.cssText = 'position:absolute;left:-9999px;top:0;width:210mm;background:#fff;color:#1a1a1a;font-family:ui-sans-serif,system-ui,sans-serif;font-size:12px;line-height:1.6;padding:20px;'
-  document.body.appendChild(container)
+function exportTabsToPDF(tabsToExport: DocumentTabState[], filename: string) {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  const pageW = doc.internal.pageSize.getWidth()
+  const pageH = doc.internal.pageSize.getHeight()
+  const margin = 15
+  const maxW = pageW - margin * 2
+  let y = margin
+
+  const need = (h: number) => { if (y + h > pageH - margin) { doc.addPage(); y = margin } }
+
+  const write = (text: string, o: { size: number; bold?: boolean; color?: number; indent?: number; gapBefore?: number; gapAfter?: number; mono?: boolean }) => {
+    if (o.gapBefore) y += o.gapBefore
+    const indent = o.indent || 0
+    doc.setFont(o.mono ? 'courier' : 'helvetica', o.bold ? 'bold' : 'normal')
+    doc.setFontSize(o.size)
+    doc.setTextColor(o.color ?? 40)
+    const lineH = o.size * 0.42 + 0.6
+    for (const ln of doc.splitTextToSize(text, maxW - indent)) {
+      need(lineH)
+      doc.text(ln, margin + indent, y)
+      y += lineH
+    }
+    if (o.gapAfter) y += o.gapAfter
+  }
+
+  const renderMarkdown = (md: string) => {
+    const lines = md.split('\n')
+    let i = 0
+    while (i < lines.length) {
+      const line = lines[i]
+      // table
+      if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[-:\s|]+\|\s*$/.test(lines[i + 1])) {
+        const head = splitRow(line)
+        i += 2
+        const body: string[][] = []
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { body.push(splitRow(lines[i])); i++ }
+        need(12)
+        autoTable(doc, {
+          startY: y, head: [head], body,
+          margin: { left: margin, right: margin },
+          styles: { fontSize: 8.5, cellPadding: 1.8, textColor: [50, 50, 50], lineColor: [220, 220, 220], lineWidth: 0.1 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [20, 20, 20], fontStyle: 'bold' },
+          theme: 'grid',
+        })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        y = (doc as any).lastAutoTable.finalY + 4
+        continue
+      }
+      // code / mermaid block
+      if (/^```/.test(line)) {
+        i++
+        const code: string[] = []
+        while (i < lines.length && !/^```/.test(lines[i])) { code.push(lines[i]); i++ }
+        i++
+        write('Diagram (source):', { size: 8, color: 120, gapBefore: 1 })
+        write(code.join('\n'), { size: 7.5, color: 110, mono: true, indent: 2, gapAfter: 2 })
+        continue
+      }
+      if (!line.trim()) { y += 1.5; i++; continue }
+      if (/^# /.test(line)) { write(stripInline(line.slice(2)), { size: 15, bold: true, color: 20, gapBefore: 2, gapAfter: 1.5 }); i++; continue }
+      if (/^## /.test(line)) { write(stripInline(line.slice(3)), { size: 12.5, bold: true, color: 30, gapBefore: 2, gapAfter: 1 }); i++; continue }
+      if (/^### /.test(line)) { write(stripInline(line.slice(4)), { size: 11, bold: true, color: 45, gapBefore: 1.5, gapAfter: 0.5 }); i++; continue }
+      if (/^---+\s*$/.test(line.trim())) { need(4); doc.setDrawColor(220); doc.line(margin, y, pageW - margin, y); y += 4; i++; continue }
+      if (/^\s*[-*] /.test(line)) { write('•  ' + stripInline(line.replace(/^\s*[-*] /, '')), { size: 9.5, color: 55, indent: 3, gapAfter: 0.4 }); i++; continue }
+      if (/^\s*\d+\.\s/.test(line)) { write(stripInline(line.trim()), { size: 9.5, color: 55, indent: 3, gapAfter: 0.4 }); i++; continue }
+      write(stripInline(line), { size: 9.5, color: 55, gapAfter: 1.2 })
+      i++
+    }
+  }
 
   if (tabsToExport.length > 1) {
-    container.innerHTML = `
-      <div style="page-break-after:always;padding:40px 20px;">
-        <h1 style="font-size:28px;margin-bottom:8px;color:#111;">AI Business Analysis Report</h1>
-        <p style="color:#666;margin-bottom:32px;">Generated by AI Business Analyst</p>
-        <h2 style="font-size:18px;margin-bottom:16px;color:#333;">Table of Contents</h2>
-        <ol style="list-style:decimal;padding-left:24px;color:#444;">
-          ${tabsToExport.map(t => `<li style="margin-bottom:8px;font-size:14px;">${t.label}</li>`).join('')}
-        </ol>
-      </div>`
+    write('AI Business Analysis Report', { size: 22, bold: true, color: 20, gapBefore: 14, gapAfter: 3 })
+    write('Generated by AI Business Analyst', { size: 11, color: 120, gapAfter: 8 })
+    write('Contents', { size: 14, bold: true, color: 30, gapAfter: 2 })
+    tabsToExport.forEach((t, i) => write(`${i + 1}.  ${t.label}`, { size: 11, color: 70, gapAfter: 0.5 }))
+    doc.addPage(); y = margin
   }
 
-  for (const tab of tabsToExport) {
-    const section = document.createElement('div')
-    if (tabsToExport.length > 1) section.style.pageBreakBefore = 'always'
-    section.style.padding = '20px'
+  tabsToExport.forEach((tab, ti) => {
+    if (ti > 0) { doc.addPage(); y = margin }
+    write(tab.label, { size: 20, bold: true, color: 17, gapAfter: 1 })
+    need(4); doc.setDrawColor(210); doc.setLineWidth(0.4); doc.line(margin, y, pageW - margin, y); doc.setLineWidth(0.2); y += 5
+    renderMarkdown(renderDocumentContent(tab.data, tab.type))
+  })
 
-    const header = document.createElement('h1')
-    header.textContent = tab.label
-    header.style.cssText = 'font-size:24px;margin-bottom:16px;color:#111;border-bottom:2px solid #e5e5e5;padding-bottom:8px;'
-    section.appendChild(header)
-
-    const content = renderDocumentContent(tab.data, tab.type)
-    const contentDiv = document.createElement('div')
-    contentDiv.style.color = '#333'
-    contentDiv.innerHTML = markdownToSimpleHTML(content)
-    section.appendChild(contentDiv)
-    container.appendChild(section)
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (html2pdf() as any)
-    .set({
-      margin: [10, 10],
-      filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
-    })
-    .from(container)
-    .save()
-
-  document.body.removeChild(container)
+  doc.save(filename)
 }
 
 export default function ExportBar({ tabs, activeTab, onReset }: Props) {
@@ -134,7 +156,7 @@ export default function ExportBar({ tabs, activeTab, onReset }: Props) {
     if (!currentTab || currentTab.status !== 'complete') return
     setIsExporting(true)
     try {
-      await exportTabsToPDF([currentTab], `${currentTab.label.toLowerCase().replace(/\s+/g, '-')}.pdf`)
+      exportTabsToPDF([currentTab], `${currentTab.label.toLowerCase().replace(/\s+/g, '-')}.pdf`)
     } catch (err) { console.error('PDF export failed:', err) }
     finally { setIsExporting(false) }
   }
@@ -143,7 +165,7 @@ export default function ExportBar({ tabs, activeTab, onReset }: Props) {
     setIsExporting(true)
     try {
       const completeTabs = tabs.filter(t => t.status === 'complete' && t.data)
-      await exportTabsToPDF(completeTabs, 'business-analysis-full.pdf')
+      exportTabsToPDF(completeTabs, 'business-analysis-full.pdf')
     } catch (err) { console.error('PDF export failed:', err) }
     finally { setIsExporting(false) }
   }
