@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useChat } from '@/hooks/useChat'
 import { useGenerate } from '@/hooks/useGenerate'
 import type { DocumentType } from '@/types'
+import { extractText } from '@/lib/fileText'
 import { useSessionHistory } from '@/hooks/useSessionHistory'
 import Header from '@/components/Header'
 import ChatPanel from '@/components/ChatPanel'
@@ -22,6 +23,7 @@ export default function App() {
   const hasCompleteDocs = gen.generation.tabs.some(t => t.status === 'complete')
   const [phase, setPhase] = useState<'chat' | 'generating' | 'complete'>(() => getInitialPhase(hasCompleteDocs))
   const [showHistory, setShowHistory] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
   const sessionIdRef = useRef<string | undefined>(undefined)
 
   // Auto-save session when generation completes or documents are edited
@@ -91,6 +93,24 @@ export default function App() {
         if (hasStaleGeneration) gen.reset()
       }
       chat.sendMessage(content)
+    }
+  }
+
+  const handleUpload = async (file: File) => {
+    setIsUploading(true)
+    try {
+      const text = await extractText(file)
+      const wrapped = `I've uploaded my notes / gathered requirements (from "${file.name}"). Please read them, recap what you can extract across the five areas, and ask me only about what's still missing.\n\n--- NOTES ---\n${text}`
+      // starting a fresh conversation? drop stale docs first (same as handleSend)
+      if (chat.messages.length === 0) {
+        const hasStaleGeneration = gen.generation.tabs.some(t => t.status !== 'idle')
+        if (hasStaleGeneration) gen.reset()
+      }
+      chat.sendMessage(wrapped)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not read that file.')
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -167,7 +187,9 @@ export default function App() {
                   isLoading={chat.isLoading}
                   readyToGenerate={false}
                   showGenerate={false}
+                  isUploading={isUploading}
                   onSend={handleSend}
+                  onUpload={handleUpload}
                   onGenerate={handleGenerate}
                 />
               </ResizablePanel>
@@ -191,7 +213,9 @@ export default function App() {
                 isLoading={chat.isLoading}
                 readyToGenerate={chat.readyToGenerate}
                 showGenerate={chat.messages.some(m => m.role === 'assistant')}
+                isUploading={isUploading}
                 onSend={handleSend}
+                onUpload={handleUpload}
                 onGenerate={handleGenerate}
               />
             </div>

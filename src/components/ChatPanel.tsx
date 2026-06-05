@@ -2,8 +2,9 @@ import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Send, FileText } from 'lucide-react'
+import { Send, FileText, Paperclip, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ACCEPTED_UPLOAD } from '@/lib/fileText'
 import ChatMessage from './ChatMessage'
 import type { ChatMessage as ChatMessageType } from '@/types'
 
@@ -12,14 +13,17 @@ interface Props {
   isLoading: boolean
   readyToGenerate: boolean
   showGenerate: boolean
+  isUploading: boolean
   onSend: (content: string) => void
+  onUpload: (file: File) => void
   onGenerate: () => void
 }
 
-export default function ChatPanel({ messages, isLoading, readyToGenerate, showGenerate, onSend, onGenerate }: Props) {
+export default function ChatPanel({ messages, isLoading, readyToGenerate, showGenerate, isUploading, onSend, onUpload, onGenerate }: Props) {
   const [input, setInput] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -48,6 +52,12 @@ export default function ChatPanel({ messages, isLoading, readyToGenerate, showGe
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) onUpload(file)
+    e.target.value = '' // allow re-selecting the same file
   }
 
   return (
@@ -81,6 +91,9 @@ export default function ChatPanel({ messages, isLoading, readyToGenerate, showGe
                 </button>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground mt-6 flex items-center gap-1 justify-center">
+              or click the <Paperclip className="inline h-3 w-3" /> button to upload your notes (.txt, .md, .pdf)
+            </p>
           </div>
         )}
         {messages.map(msg => (
@@ -127,7 +140,19 @@ export default function ChatPanel({ messages, isLoading, readyToGenerate, showGe
             )}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
+          <input ref={fileInputRef} type="file" accept={ACCEPTED_UPLOAD} className="hidden" onChange={handleFileChange} />
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={isUploading || isLoading}
+            onClick={() => fileInputRef.current?.click()}
+            title="Upload notes (.txt, .md, .pdf)"
+            className="shrink-0 h-[44px] w-[44px]"
+          >
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+          </Button>
           <Textarea
             ref={textareaRef}
             value={input}
