@@ -54,13 +54,24 @@ interface Props {
 // which break Mermaid. Shape delimiters like [( )] and ([ ]) have no space before "(",
 // so stripping " (...)" removes only the annotations, never a valid shape.
 function sanitizeMermaid(chart: string): string {
-  let c = chart
-  // 1) Strip parenthetical annotations like " (FCM)" anywhere (cylinder [( )] and
-  //    stadium ([ ]) shapes have no space before "(", so they're untouched).
-  c = c.replace(/ \([^)]*\)/g, '')
-  // 2) Hard-clean hexagon {{...}} and rhombus labels, which must NOT contain
-  //    ( ) [ ] " ' | — the most common cause of "got '1'" / parse errors.
-  c = c.replace(/\{\{([^{}]*)\}\}/g, (_m, l) => '{{' + l.replace(/[()[\]"'|]/g, '').replace(/\s+/g, ' ').trim() + '}}')
+  const type = chart.trim().split(/[\s\n]/)[0]
+
+  // Sequence diagrams break when message/note text contains ; { } ( ) — Mermaid reads
+  // ";" as a statement separator and "{ }" as syntax. Clean the text after the first
+  // ":" on each line (that's where the message/note content lives).
+  if (type === 'sequenceDiagram') {
+    return chart.split('\n').map(line => {
+      const idx = line.indexOf(':')
+      if (idx === -1) return line
+      const text = line.slice(idx + 1).replace(/;/g, ',').replace(/[{}()]/g, '')
+      return line.slice(0, idx + 1) + text
+    }).join('\n')
+  }
+
+  // Flowchart / graph: strip " (annotations)" and hard-clean hexagon {{...}} labels
+  // ([( )] cylinders and ([ ]) stadiums have no space before "(", so they're safe).
+  let c = chart.replace(/ \([^)]*\)/g, '')
+  c = c.replace(/\{\{([^{}]*)\}\}/g, (_m, l) => '{{' + l.replace(/[^A-Za-z0-9 ./&%+-]/g, '').replace(/\s+/g, ' ').trim() + '}}')
   return c
 }
 
@@ -75,9 +86,15 @@ export default function MermaidDiagram({ chart, className }: Props) {
 
     const renderOnce = async (src: string) => {
       const id = `mermaid-${crypto.randomUUID().replace(/-/g, '')}`
-      const { svg: rendered } = await mermaid.render(id, src.trim())
-      // Defense in depth: sanitize the rendered SVG before injecting it.
-      return DOMPurify.sanitize(rendered, { USE_PROFILES: { svg: true, svgFilters: true } })
+      try {
+        const { svg: rendered } = await mermaid.render(id, src.trim())
+        // Defense in depth: sanitize the rendered SVG before injecting it.
+        return DOMPurify.sanitize(rendered, { USE_PROFILES: { svg: true, svgFilters: true } })
+      } finally {
+        // On failure Mermaid leaves an orphan node ('d' + id, or id) in <body>. Remove it.
+        document.getElementById(id)?.remove()
+        document.getElementById('d' + id)?.remove()
+      }
     }
 
     const render = async () => {
@@ -98,11 +115,8 @@ export default function MermaidDiagram({ chart, className }: Props) {
           setError(err instanceof Error ? err.message : 'Failed to render diagram')
           setSvg('')
         }
-        // Mermaid leaves error elements in the DOM on failure — clean them up
-        const errorElement = document.getElementById('d' + 'mermaid-error')
-        if (errorElement) {
-          errorElement.remove()
-        }
+        // Sweep any stray Mermaid error nodes that leaked into <body>.
+        document.querySelectorAll('body > [id^="dmermaid-"], body > svg[id^="mermaid-"]').forEach(el => el.remove())
       }
     }
 
