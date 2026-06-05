@@ -13,7 +13,15 @@ function loadSessions(): SavedSession[] {
 }
 
 function saveSessions(sessions: SavedSession[]) {
-  localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+  try {
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions))
+  } catch {
+    // localStorage quota exceeded — drop oldest sessions and retry, then give up
+    // quietly rather than crashing the whole app.
+    for (const keep of [10, 5, 2, 1, 0]) {
+      try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, keep))); return } catch { /* try fewer */ }
+    }
+  }
 }
 
 // Extract a short name from the first user message

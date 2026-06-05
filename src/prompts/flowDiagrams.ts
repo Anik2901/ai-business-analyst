@@ -44,12 +44,13 @@ Produce a valid Mermaid journey diagram with ALL of the following:
 1. Start with: journey
 2. Add a title: title [Descriptive title for the primary user flow]
 
-3. **Minimum 4 sections** representing phases of the user's interaction:
+3. **3 to 4 sections** representing phases of the user's interaction:
    - Section names should be product-specific (e.g., "Discovery", "Registration", "First Purchase", "Ongoing Use")
    - NOT generic labels like "Phase 1", "Phase 2"
 
-4. **4-6 tasks per section** with satisfaction scores (1-5):
-   - Format: [Task description]: [score]: [Actor]
+4. **2-3 tasks per section** with satisfaction scores (1-5):
+   - Format: [Short task label]: [score]: [Actor]
+   - Keep each task label SHORT — 2 to 4 words MAX (e.g. "Sign up", "Verify email", "First swap"). Long labels overflow the journey boxes and overlap each other.
    - Scores should realistically vary — not all 5s:
      - 5 = Delightful, exceeds expectations
      - 4 = Smooth, meets expectations
@@ -59,7 +60,7 @@ Produce a valid Mermaid journey diagram with ALL of the following:
    - At least 2 tasks should score 2-3 to show realistic pain points
    - Actor should be the primary user persona name
 
-5. **Minimum 16 tasks total** across all sections
+5. **8 to 10 tasks total, MAX** — too many tasks cram the journey diagram and cause the labels to overlap and spill out of the boxes
 
 6. **Story arc:** The journey should tell a realistic story — initial excitement, some friction during setup, satisfaction during core use, potential drop-off points
 
