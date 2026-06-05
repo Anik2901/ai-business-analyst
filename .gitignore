@@ -5,3 +5,6 @@ dist
 .playwright-mcp
 edge-profile-fresh
 chrome-profile-fresh
+
+# local session notes (never publish)
+SESSION_CONTEXT_*.md
