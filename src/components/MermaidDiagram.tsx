@@ -140,15 +140,11 @@ export default function MermaidDiagram({ chart, className }: Props) {
   if (error) {
     return (
       <div className={className}>
-        <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-2">
-          <p className="text-sm text-destructive font-medium mb-1">
-            Diagram could not render
+        <div className="border border-border/50 rounded-lg bg-background/50 p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            This diagram couldn't be rendered. The written sections still apply — try regenerating this document.
           </p>
-          <p className="text-xs text-muted-foreground">{error}</p>
         </div>
-        <pre className="bg-muted rounded-lg p-4 overflow-x-auto text-xs leading-relaxed">
-          <code>{chart}</code>
-        </pre>
       </div>
     )
   }
