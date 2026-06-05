@@ -54,7 +54,14 @@ interface Props {
 // which break Mermaid. Shape delimiters like [( )] and ([ ]) have no space before "(",
 // so stripping " (...)" removes only the annotations, never a valid shape.
 function sanitizeMermaid(chart: string): string {
-  return chart.replace(/ \([^)]*\)/g, '')
+  let c = chart
+  // 1) Strip parenthetical annotations like " (FCM)" anywhere (cylinder [( )] and
+  //    stadium ([ ]) shapes have no space before "(", so they're untouched).
+  c = c.replace(/ \([^)]*\)/g, '')
+  // 2) Hard-clean hexagon {{...}} and rhombus labels, which must NOT contain
+  //    ( ) [ ] " ' | — the most common cause of "got '1'" / parse errors.
+  c = c.replace(/\{\{([^{}]*)\}\}/g, (_m, l) => '{{' + l.replace(/[()[\]"'|]/g, '').replace(/\s+/g, ' ').trim() + '}}')
+  return c
 }
 
 export default function MermaidDiagram({ chart, className }: Props) {
