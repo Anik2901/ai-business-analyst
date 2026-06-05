@@ -68,6 +68,7 @@ Always in **`.env`**, as `LLM_API_KEY`:
 | `Model 'X' is not available` / 404 | `VITE_MODEL` must match a model your endpoint lists (`/models`). |
 | 401 / auth error | Wrong/missing `LLM_API_KEY`, or wrong `VITE_LLM_PROTOCOL` for this provider. |
 | Wrong protocol | OpenAI-style providers (OpenRouter/OpenAI/Groq/Ollama) need `VITE_LLM_PROTOCOL=openai`; Anthropic needs `anthropic`. |
+| `max_tokens: ... too large` / 400 on generation | Your model has a smaller output cap. Set `VITE_MAX_TOKENS` lower (e.g. 8192 or 4096). |
 | Changed `.env`, no effect | Restart `npm run dev` — env is read at startup. |
 | Local docs lower quality | Use the largest Ollama model your hardware can run. |
 | `connection refused` (Ollama) | Make sure `ollama serve` is running and the port matches. |

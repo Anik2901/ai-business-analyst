@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { streamLLM } from '@/lib/llm'
+import { MAX_TOKENS } from '@/lib/config'
 import { getBRDPrompt, getFRDPrompt, getNFRPrompt } from '@/prompts/requirements'
 import { getUserStoriesPrompt } from '@/prompts/userStories'
 import { getArchitecturePrompt } from '@/prompts/architecture'
@@ -233,15 +234,14 @@ export function useGenerate() {
     const onChunk = (fullText: string) => { setStreamingText(fullText) }
 
     const stepConfig: Record<number, { type: DocumentType; getPrompt: () => string; maxTokens: number }> = {
-      // Token budgets sized to each doc — User Stories / Risk are the largest and
-      // were truncating at 8192 (which broke the JSON). Larger caps prevent that.
-      1: { type: 'brd', maxTokens: 10000, getPrompt: () => getBRDPrompt(chatContext) },
-      2: { type: 'frd', maxTokens: 12000, getPrompt: () => getFRDPrompt(chatContext, outputs.brd || '') },
-      3: { type: 'nfr', maxTokens: 10000, getPrompt: () => getNFRPrompt(chatContext, outputs.brd || '', outputs.frd || '') },
-      4: { type: 'stories', maxTokens: 16000, getPrompt: () => getUserStoriesPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || '') + '\n' + (outputs.nfr || '')) },
-      5: { type: 'architecture', maxTokens: 12000, getPrompt: () => getArchitecturePrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '') },
-      6: { type: 'flows', maxTokens: 12000, getPrompt: () => getFlowDiagramsPrompt(chatContext, outputs.frd || '', outputs.stories || '', outputs.architecture || '') },
-      7: { type: 'risk', maxTokens: 16000, getPrompt: () => getRiskAnalysisPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '', outputs.architecture || '', outputs.flows || '') },
+      // Output cap per doc — configurable via VITE_MAX_TOKENS (config.ts), not hardcoded.
+      1: { type: 'brd', maxTokens: MAX_TOKENS, getPrompt: () => getBRDPrompt(chatContext) },
+      2: { type: 'frd', maxTokens: MAX_TOKENS, getPrompt: () => getFRDPrompt(chatContext, outputs.brd || '') },
+      3: { type: 'nfr', maxTokens: MAX_TOKENS, getPrompt: () => getNFRPrompt(chatContext, outputs.brd || '', outputs.frd || '') },
+      4: { type: 'stories', maxTokens: MAX_TOKENS, getPrompt: () => getUserStoriesPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || '') + '\n' + (outputs.nfr || '')) },
+      5: { type: 'architecture', maxTokens: MAX_TOKENS, getPrompt: () => getArchitecturePrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '') },
+      6: { type: 'flows', maxTokens: MAX_TOKENS, getPrompt: () => getFlowDiagramsPrompt(chatContext, outputs.frd || '', outputs.stories || '', outputs.architecture || '') },
+      7: { type: 'risk', maxTokens: MAX_TOKENS, getPrompt: () => getRiskAnalysisPrompt(chatContext, (outputs.brd || '') + '\n' + (outputs.frd || ''), outputs.stories || '', outputs.architecture || '', outputs.flows || '') },
     }
 
     const config = stepConfig[step]
